@@ -20,3 +20,18 @@ A: The payroll team is reachable at payroll@hrdesk.example. Response time is usu
 
 Q: Where can I find the employee handbook?
 A: The full handbook is available in the employee portal under "Resources." A printed copy is available on request.
+
+Q: How do I submit an expense reimbursement?
+A: Submit receipts through the expense portal within 30 days of the purchase. Reimbursements are processed with the next payroll run. For amounts over 500 EUR, manager approval is required before submission.
+
+Q: Is there a training or learning budget?
+A: Yes. Every full-time employee has an annual learning budget of 1,500 EUR for courses, books, and conferences. Unused budget does not carry over to the next year.
+
+Q: What is the employee referral bonus?
+A: If a person you refer is hired and stays for at least 6 months, you receive a 2,000 EUR bonus paid with the next salary cycle. There is no limit on the number of referrals per year.
+
+Q: When does my health insurance coverage start?
+A: Coverage begins on the first day of employment. Your insurance card is issued within 2 weeks. For urgent medical care before the card arrives, contact HR for a temporary confirmation letter.
+
+Q: How long is the probation period for new hires?
+A: The standard probation period is 6 months. During this time, either party may terminate the contract with 2 weeks notice. After probation, notice periods follow the terms in your employment contract.

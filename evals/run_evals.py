@@ -1,6 +1,6 @@
 """Evaluation harness for HRDesk.
 
-Reads evals/golden.jsonl, runs each question through the agent, and reports:
+Reads evals/eval_set.jsonl, runs each question through the agent, and reports:
   - Routing accuracy   (did the classifier pick the expected route?)
   - Retrieval hit@3    (did the expected source appear in the top-3 chunks?)
   - Answer correctness (does the final answer contain all required keywords?)
@@ -22,7 +22,7 @@ from hrdesk.ingestion.pipeline import ingest_directory
 from hrdesk.retrieval import hybrid
 from hrdesk.retrieval.vector_store import index_chunks
 
-GOLDEN_PATH = Path(__file__).parent / "golden.jsonl"
+EVAL_SET_PATH = Path(__file__).parent / "eval_set.jsonl"
 RESULTS_DIR = Path(__file__).parent / "results"
 
 
@@ -175,7 +175,7 @@ def main() -> None:
     index_chunks(chunks)
     hybrid.build_index(chunks)
 
-    cases = load_cases(GOLDEN_PATH)
+    cases = load_cases(EVAL_SET_PATH)
     print(f"Running {len(cases)} eval cases against provider={settings.llm_provider}...")
 
     results: list[Result] = []

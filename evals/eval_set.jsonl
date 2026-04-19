@@ -12,6 +12,13 @@
 {"id": "pol_payroll_contact", "question": "Who do I contact for payroll questions?", "route": "CAN_ANSWER", "source": "faq.txt", "must_contain": ["payroll@hrdesk.example"]}
 {"id": "pol_leave_request", "question": "How do I submit a leave request?", "route": "CAN_ANSWER", "source": "leave_policy.md", "must_contain": ["portal"]}
 {"id": "pol_parental_submit", "question": "How far in advance should parental leave be requested?", "route": "CAN_ANSWER", "source": "leave_policy.md", "must_contain": ["60"]}
+{"id": "pol_expenses", "question": "How do I submit an expense reimbursement?", "route": "CAN_ANSWER", "source": "faq.txt", "must_contain": ["30"]}
+{"id": "pol_training_budget", "question": "Is there a training budget?", "route": "CAN_ANSWER", "source": "faq.txt", "must_contain": ["1,500"]}
+{"id": "pol_referral_bonus", "question": "What is the employee referral bonus?", "route": "CAN_ANSWER", "source": "faq.txt", "must_contain": ["2,000"]}
+{"id": "pol_insurance_start", "question": "When does my health insurance coverage start?", "route": "CAN_ANSWER", "source": "faq.txt", "must_contain": ["first day"]}
+{"id": "pol_probation", "question": "How long is the probation period for new hires?", "route": "CAN_ANSWER", "source": "faq.txt", "must_contain": ["6 months"]}
+{"id": "edge_fragment_training", "question": "training budget", "route": "CAN_ANSWER", "source": "faq.txt", "must_contain": ["1,500"]}
+{"id": "edge_fragment_dress", "question": "dress code", "route": "CAN_ANSWER", "source": "handbook.pdf", "must_contain": ["casual"]}
 {"id": "tool_vacation_left", "question": "How many vacation days do I have left?", "route": "CALL_EXTERNAL_TOOL", "must_contain": ["18"]}
 {"id": "tool_my_balance", "question": "What is my current vacation balance?", "route": "CALL_EXTERNAL_TOOL", "must_contain": ["18"]}
 {"id": "tool_days_used", "question": "How many vacation days have I used this year?", "route": "CALL_EXTERNAL_TOOL", "must_contain": ["7"]}
