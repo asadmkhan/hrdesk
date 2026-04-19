@@ -1,0 +1,17 @@
+[project]
+name = "hrdesk-hr-service"
+version = "0.1.0"
+description = "Mock HR service for HRDesk take-home"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.118.0",
+    "uvicorn>=0.44.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]

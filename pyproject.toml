@@ -1,0 +1,46 @@
+[project]
+name = "hrdesk"
+version = "0.1.0"
+description = "RAG chatbot for HR and policy queries with tool calling"
+readme = "README.md"
+authors = [
+    { name = "Asad Khan", email = "asadmateenkhan@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "colorama>=0.4.6",
+    "fastapi>=0.136.0",
+    "langchain-anthropic>=1.4.1",
+    "langchain-chroma>=1.1.0",
+    "langchain-classic>=1.0.4",
+    "langchain-community>=0.4.1",
+    "langchain-core>=1.3.0",
+    "langchain-huggingface>=1.2.2",
+    "langchain-ollama>=1.1.0",
+    "langchain-text-splitters>=1.1.2",
+    "pydantic-settings>=2.13.1",
+    "pypdf>=6.10.2",
+    "rank-bm25>=0.2.2",
+    "sentence-transformers>=5.4.1",
+    "structlog>=25.5.0",
+    "uvicorn>=0.44.0",
+]
+
+[project.scripts]
+hrdesk = "hrdesk:main"
+
+[build-system]
+requires = ["uv_build>=0.11.7,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

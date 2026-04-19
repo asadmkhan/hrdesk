@@ -1,0 +1,22 @@
+HRDesk Frequently Asked Questions
+
+Q: How do I check my remaining vacation balance?
+A: Use the chatbot and ask "how many vacation days do I have left?" Your balance is pulled live from the HR system.
+
+Q: How do I reset my HR portal password?
+A: Go to the login page and click "Forgot password." A reset link is sent to your registered work email. The link expires in 30 minutes.
+
+Q: What are the standard working hours?
+A: Core working hours are 09:00 to 17:00 Monday through Friday. Flexible start and end times are allowed with manager approval, as long as core hours 10:00 to 15:00 are covered.
+
+Q: Can I work remotely?
+A: Yes. HRDesk supports hybrid work. By default, employees are expected to be in the office 2 days per week, but this can be adjusted per team agreement.
+
+Q: How is overtime handled?
+A: Hours worked beyond 40 per week may be taken as compensatory time off. Overtime pay is only offered for approved weekend or holiday work.
+
+Q: Who do I contact for payroll questions?
+A: The payroll team is reachable at payroll@hrdesk.example. Response time is usually 2 business days.
+
+Q: Where can I find the employee handbook?
+A: The full handbook is available in the employee portal under "Resources." A printed copy is available on request.
