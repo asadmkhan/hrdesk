@@ -6,6 +6,11 @@ from pydantic import BaseModel
 app = FastAPI(title="Mock HR Service", version="0.1.0")
 
 
+class EmployeeProfile(BaseModel):
+    employee_id: str
+    employee_name: str
+
+
 class VacationBalance(BaseModel):
     employee_id: str
     employee_name: str
@@ -22,7 +27,7 @@ _EMPLOYEES: dict[str, dict] = {
         "days_used": 7,
     },
     "E002": {
-        "employee_name": "James Cook ",
+        "employee_name": "James Cook",
         "days_total": 25,
         "days_used": 14,
     },
@@ -37,6 +42,17 @@ _EMPLOYEES: dict[str, dict] = {
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/employees/{employee_id}/profile", response_model=EmployeeProfile)
+def get_profile(employee_id: str) -> EmployeeProfile:
+    if employee_id not in _EMPLOYEES:
+        raise HTTPException(status_code=404, detail=f"Employee not found: {employee_id}")
+
+    return EmployeeProfile(
+        employee_id=employee_id,
+        employee_name=_EMPLOYEES[employee_id]["employee_name"],
+    )
 
 
 @app.get("/employees/{employee_id}/vacation", response_model=VacationBalance)

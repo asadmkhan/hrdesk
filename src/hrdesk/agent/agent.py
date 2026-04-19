@@ -20,6 +20,11 @@ CURRENT_EMPLOYEE_ID = "E001"
 
 _JSON_OBJECT = re.compile(r"\{.*\}", re.DOTALL)
 
+_OTHER_USER_REPLY = (
+    "I can only look up your own HR data. For questions about other employees, "
+    "please contact HR directly."
+)
+
 
 def answer(question: str, provider_override: LLMProvider | None = None) -> str:
     route = _classify(question, provider_override)
@@ -66,17 +71,20 @@ def _answer_from_docs(question: str, provider_override: LLMProvider | None = Non
 
 
 def _answer_via_tool(question: str, provider_override: LLMProvider | None = None) -> str:
+    if _asks_about_another_person(question):
+        log.info("tool_request_about_other_person", question=question)
+        return _OTHER_USER_REPLY
+
     schemas = registry.all_schemas()
     tool_list = "\n".join(
         f"- {s.name}: {s.description}\n  parameters: {json.dumps(s.parameters)}" for s in schemas
     )
     selection_prompt = (
-        f"The current user is employee_id='{CURRENT_EMPLOYEE_ID}'.\n\n"
-        "Pick a tool and its arguments to answer the user's question.\n\n"
+        "Pick one tool to answer the user's question. Tools only return data "
+        "for the currently authenticated user — they do not accept a name or ID.\n\n"
         f"Available tools:\n{tool_list}\n\n"
-        "Respond with a JSON object ONLY, in this exact shape:\n"
-        '{"tool": "tool_name", "arguments": {"arg": "value"}}\n'
-        "No explanation, no markdown, no code fences. Just the JSON."
+        'Respond with JSON only: {"tool": "tool_name", "arguments": {}}\n'
+        "No explanation, no markdown, no code fences."
     )
 
     provider = get_provider(provider_override)
@@ -100,8 +108,8 @@ def _answer_via_tool(question: str, provider_override: LLMProvider | None = None
 
     tool_name = parsed.get("tool", "")
     arguments = parsed.get("arguments", {})
-    tool_result = registry.run(tool_name, arguments)
-    log.info("tool_executed", tool=tool_name, args=arguments)
+    tool_result = registry.run(tool_name, arguments, CURRENT_EMPLOYEE_ID)
+    log.info("tool_executed", tool=tool_name)
 
     reply = provider.chat(
         [
@@ -113,3 +121,24 @@ def _answer_via_tool(question: str, provider_override: LLMProvider | None = None
         ]
     )
     return reply.content
+
+
+def _asks_about_another_person(question: str) -> bool:
+    q = question.lower()
+    third_party_markers = [
+        " for ",
+        " about ",
+        " does ",
+        "employee ",
+        "'s ",
+        "he ",
+        "she ",
+        "they ",
+        "his ",
+        "her ",
+        "their ",
+    ]
+    self_markers = ["my ", "me", " i ", " i'", "mine"]
+    has_third_party = any(m in q for m in third_party_markers)
+    has_self = any(m in q for m in self_markers) or q.strip().startswith(("i ", "i'"))
+    return has_third_party and not has_self

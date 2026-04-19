@@ -16,13 +16,15 @@ Your only job is to categorize the user's question into exactly one of three lab
     "probation period"
     "referral bonus"
 
-- CALL_EXTERNAL_TOOL: The question asks for a specific employee's personal,
-  current, or real-time data that is NOT the same for everyone and lives in
-  the HR system (not the documents). Examples:
-    "How many vacation days do I have LEFT?"      (asks current balance)
+- CALL_EXTERNAL_TOOL: The question asks for the current user's personal data
+  from the HR system. Covers both live data (vacation balance, days used) and
+  identity (their name, their employee ID). Examples:
+    "How many vacation days do I have LEFT?"
     "What's my current balance?"
     "How many days have I used this year?"
-    "Check my remaining vacation."
+    "What is my name?"
+    "Who am I?"
+    "What's my employee ID?"
 
 - NO_MATCH: The question is unrelated to HR or the company. Examples:
     "What's the weather?"
