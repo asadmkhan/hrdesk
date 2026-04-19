@@ -74,6 +74,24 @@ Rules:
 """
 
 
+TOOL_SELECTION_TEMPLATE = """You pick one tool to answer the user's question.
+
+Available tools:
+{tool_list}
+
+Rules:
+- All tools operate on the currently authenticated user only.
+- You never pass a name, ID, or any other identifier as an argument.
+- The arguments object is always empty: {{}}.
+
+Output format (JSON only, no prose, no code fences):
+{{"tool": "<tool name from the list above>", "arguments": {{}}}}
+
+Example:
+User: how many vacation days do I have left?
+Output: {{"tool": "get_my_vacation_balance", "arguments": {{}}}}"""
+
+
 NO_MATCH_REPLY = (
     "I'm HRDesk, your HR assistant. I can help with questions about company "
     "policies, benefits, and your personal HR data like vacation balance. "

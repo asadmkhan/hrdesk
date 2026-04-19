@@ -6,13 +6,16 @@ from hrdesk.agent.prompts import (
     CLASSIFIER_SYSTEM_PROMPT,
     NO_MATCH_REPLY,
     TOOL_ANSWER_SYSTEM_PROMPT,
+    TOOL_SELECTION_TEMPLATE,
 )
 from hrdesk.config import LLMProvider
+from hrdesk.domain.document import Chunk
 from hrdesk.domain.message import Message
 from hrdesk.observability.logging import get_logger
 from hrdesk.providers.factory import get_provider
 from hrdesk.retrieval import hybrid
 from hrdesk.tools import registry
+from hrdesk.tools.base import ToolSchema
 
 log = get_logger(__name__)
 
@@ -24,6 +27,8 @@ _OTHER_USER_REPLY = (
     "I can only look up your own HR data. For questions about other employees, "
     "please contact HR directly."
 )
+
+_TOOL_SELECTION_FAILED = "I tried to look that up but couldn't determine which tool to use."
 
 
 def answer(question: str, provider_override: LLMProvider | None = None) -> str:
@@ -57,14 +62,11 @@ def _answer_from_docs(question: str, provider_override: LLMProvider | None = Non
     if not chunks:
         return "I could not find any relevant information in the HR documents."
 
-    context = "\n\n".join(f"[source: {c.source.name}]\n{c.text}" for c in chunks)
-    user_prompt = f"Context:\n{context}\n\nQuestion: {question}"
-
     provider = get_provider(provider_override)
     reply = provider.chat(
         [
             Message(role="system", content=ANSWER_SYSTEM_PROMPT),
-            Message(role="user", content=user_prompt),
+            Message(role="user", content=_build_rag_user_prompt(question, chunks)),
         ]
     )
     return reply.content
@@ -75,52 +77,57 @@ def _answer_via_tool(question: str, provider_override: LLMProvider | None = None
         log.info("tool_request_about_other_person", question=question)
         return _OTHER_USER_REPLY
 
-    schemas = registry.all_schemas()
-    tool_list = "\n".join(
-        f"- {s.name}: {s.description}\n  parameters: {json.dumps(s.parameters)}" for s in schemas
-    )
-    selection_prompt = (
-        "Pick one tool to answer the user's question. Tools only return data "
-        "for the currently authenticated user — they do not accept a name or ID.\n\n"
-        f"Available tools:\n{tool_list}\n\n"
-        'Respond with JSON only: {"tool": "tool_name", "arguments": {}}\n'
-        "No explanation, no markdown, no code fences."
-    )
-
     provider = get_provider(provider_override)
     selection = provider.chat(
         [
-            Message(role="system", content=selection_prompt),
-            Message(role="user", content=question),
+            Message(role="system", content=_build_tool_selection_prompt(registry.all_schemas())),
+            Message(role="user", content=f"User: {question}\nOutput:"),
         ]
     )
 
-    match = _JSON_OBJECT.search(selection.content)
-    if match is None:
-        log.warning("tool_selection_no_json", raw=selection.content)
-        return "I tried to look that up but couldn't determine which tool to use."
+    tool_name, arguments = _parse_tool_selection(selection.content)
+    if tool_name is None:
+        return _TOOL_SELECTION_FAILED
 
-    try:
-        parsed = json.loads(match.group(0))
-    except json.JSONDecodeError:
-        log.warning("tool_selection_bad_json", raw=selection.content)
-        return "I tried to look that up but couldn't determine which tool to use."
-
-    tool_name = parsed.get("tool", "")
-    arguments = parsed.get("arguments", {})
     tool_result = registry.run(tool_name, arguments, CURRENT_EMPLOYEE_ID)
     log.info("tool_executed", tool=tool_name)
 
     reply = provider.chat(
         [
             Message(role="system", content=TOOL_ANSWER_SYSTEM_PROMPT),
-            Message(
-                role="user",
-                content=f"Question: {question}\n\nTool result: {tool_result}",
-            ),
+            Message(role="user", content=_build_tool_answer_prompt(question, tool_result)),
         ]
     )
     return reply.content
+
+
+def _build_rag_user_prompt(question: str, chunks: list[Chunk]) -> str:
+    context = "\n\n".join(f"[source: {c.source.name}]\n{c.text}" for c in chunks)
+    return f"Context:\n{context}\n\nQuestion: {question}"
+
+
+def _build_tool_selection_prompt(schemas: list[ToolSchema]) -> str:
+    tool_list = "\n".join(f"- {s.name}: {s.description}" for s in schemas)
+    return TOOL_SELECTION_TEMPLATE.format(tool_list=tool_list)
+
+
+def _build_tool_answer_prompt(question: str, tool_result: str) -> str:
+    return f"Question: {question}\n\nTool result: {tool_result}"
+
+
+def _parse_tool_selection(raw: str) -> tuple[str | None, dict]:
+    match = _JSON_OBJECT.search(raw)
+    if match is None:
+        log.warning("tool_selection_no_json", raw=raw)
+        return None, {}
+
+    try:
+        parsed = json.loads(match.group(0))
+    except json.JSONDecodeError:
+        log.warning("tool_selection_bad_json", raw=raw)
+        return None, {}
+
+    return parsed.get("tool") or None, parsed.get("arguments", {}) or {}
 
 
 def _asks_about_another_person(question: str) -> bool:

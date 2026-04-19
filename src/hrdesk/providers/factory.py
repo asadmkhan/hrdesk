@@ -8,13 +8,17 @@ _REGISTRY = {
     LLMProvider.OLLAMA: OllamaProvider,
 }
 
+_cache: dict[LLMProvider, ChatProvider] = {}
+
 
 def get_provider(override: LLMProvider | None = None) -> ChatProvider:
     choice = override or settings.llm_provider
     cls = _REGISTRY.get(choice)
     if cls is None:
         raise ValueError(f"Unsupported provider: {choice}")
-    return cls()
+    if choice not in _cache:
+        _cache[choice] = cls()
+    return _cache[choice]
 
 
 def available_providers() -> list[LLMProvider]:

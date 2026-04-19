@@ -10,13 +10,18 @@ log = get_logger(__name__)
 
 COLLECTION_NAME = "hrdesk_chunks"
 
+_store: Chroma | None = None
+
 
 def get_vector_store() -> Chroma:
-    return Chroma(
-        collection_name=COLLECTION_NAME,
-        embedding_function=get_embedder(),
-        persist_directory=str(settings.chroma_dir),
-    )
+    global _store
+    if _store is None:
+        _store = Chroma(
+            collection_name=COLLECTION_NAME,
+            embedding_function=get_embedder(),
+            persist_directory=str(settings.chroma_dir),
+        )
+    return _store
 
 
 def index_chunks(chunks: list[Chunk]) -> None:
@@ -25,6 +30,7 @@ def index_chunks(chunks: list[Chunk]) -> None:
         return
 
     store = get_vector_store()
+    store.reset_collection()
     lc_docs = [to_langchain_document(c) for c in chunks]
     store.add_documents(lc_docs)
     log.info("chunks_indexed", count=len(chunks))
