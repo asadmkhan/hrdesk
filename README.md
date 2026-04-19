@@ -1,55 +1,46 @@
 # HRDesk
 
-A RAG chatbot for HR questions. It answers policy questions from company
-documents and looks up personal HR data (like vacation balance) from a live
-HR service.
+RAG chatbot for HR questions. Answers policy stuff from company docs, looks up
+personal data (vacation balance) from a mock HR service.
 
-Built as a take-home assignment. The architecture is close to what I would
-use in production.
+Take-home project.
 
 ## What it does
 
-Three kinds of questions, three different routes:
+Three types of questions, three code paths:
 
-**Policy question** — *"What is the dress code?"*
-Retrieves the relevant chunks from the HR documents, answers with a citation.
+- policy question (e.g. "what's the dress code?") → retrieve from docs, cite source
+- personal data ("how many vacation days do I have left?") → call the HR service
+- off-topic ("what's the weather?") → canned refusal, no LLM call
 
-**Personal data question** — *"How many vacation days do I have left?"*
-Calls the mock HR service over HTTP, phrases the result naturally.
+A small classifier picks the path on every turn.
 
-**Off-topic question** — *"What's the weather?"*
-Returns a polite refusal. No LLM call, no tokens spent.
+## Run
 
-An LLM classifier picks the route on every turn.
+You need three things running: an LLM provider (Ollama or Anthropic), the mock HR
+service, and the web app.
 
-## Running it
-
-You need three things up: Ollama (or an Anthropic key), the mock HR service,
-and HRDesk itself.
-
-### 1. Ollama
-
-Install Ollama, then pull a small model:
+### Ollama
 
 ```
 ollama pull llama3.2:3b
 ```
 
-On Windows, Ollama runs as a background service — nothing else to start.
+On Windows it runs as a tray service, no extra step. Use `qwen2.5:7b` instead
+if you have GPU + 8GB VRAM, it's noticeably better.
 
-### 2. Mock HR service
+### Mock HR service
 
-This is a separate FastAPI app that simulates a real HR system like Workday.
-It lives in `external/hr_service/` with its own `pyproject.toml`.
+Separate FastAPI app, own pyproject. In its own terminal:
 
 ```
 cd external/hr_service
 uv run uvicorn main:app --port 8001
 ```
 
-Leave this running.
+Leave it running.
 
-### 3. HRDesk
+### Web app
 
 In a fresh terminal at the project root:
 
@@ -58,121 +49,114 @@ uv sync
 uv run hrdesk
 ```
 
-First run takes a minute — uv installs deps, the embedding model downloads
-(~90MB), Chroma builds the vector index.
+First run downloads the embedding model (~90MB) and builds the vector index.
+Takes about a minute.
 
-Open http://127.0.0.1:8000 in a browser. You'll see a chat UI with example
-questions you can click.
+Open http://127.0.0.1:8000. Top-right dropdown lets you switch between Ollama
+and Anthropic per request — only providers that are actually working show up.
 
-### Using Anthropic instead of Ollama
+### Anthropic instead of Ollama
 
-Copy `.env.example` to `.env` and set:
+Copy `.env.example` to `.env`, set:
 
 ```
 LLM_PROVIDER=anthropic
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-No code changes. Swapping providers is the whole point of the adapter layer.
+Same pipeline, different backend.
 
 ## Architecture
 
 ```
-Browser ──▶ HRDesk web app ──▶ Ollama / Anthropic
+Browser ──▶ HRDesk web (:8000) ──▶ Ollama / Anthropic
                │
-               └──▶ Mock HR service (FastAPI, :8001)
+               └──▶ Mock HR service (:8001)
 ```
 
-Inside HRDesk, each question flows through:
+Per-question flow:
 
 ```
 question
-   ↓
-classify (LLM)
-   ├─ CAN_ANSWER          → hybrid search → LLM with context → answer
-   ├─ CALL_EXTERNAL_TOOL  → pick tool + args → run → LLM with result → answer
-   └─ NO_MATCH            → canned refusal (no LLM call)
+  ↓
+classify
+  ├─ CAN_ANSWER          → hybrid search + LLM with context
+  ├─ CALL_EXTERNAL_TOOL  → pick tool + args → run → LLM with result
+  └─ NO_MATCH            → hardcoded refusal
 ```
 
-## Project layout
+## Layout
 
 ```
 src/hrdesk/
-├── config.py        settings loaded from .env
-├── domain/          Document, Chunk, Message, ToolCall
-├── providers/       LLM adapters (Anthropic, Ollama) behind one Protocol
-├── ingestion/       load → chunk → emit
-├── retrieval/       vector + BM25 + hybrid (reciprocal rank fusion)
-├── tools/           tool definitions + registry
-├── agent/           prompts, classifier, answer generation
-├── observability/   structlog setup
-└── web/             FastAPI app + minimal HTML chat UI
+├── config.py        .env-driven settings
+├── domain/          Document, Chunk, Message
+├── providers/       Anthropic + Ollama adapters
+├── ingestion/       loaders, chunker, pipeline
+├── retrieval/       chroma + bm25 + hybrid
+├── tools/           tool protocol + registry + vacation tool
+├── agent/           prompts + 3-way routing
+├── observability/   structlog
+└── web/             FastAPI + chat HTML
 
-external/hr_service/   standalone mock service (FastAPI on port 8001)
-data/                  sample HR documents (PDF, TXT, Markdown)
+external/hr_service/   separate mock service
+data/                  sample HR docs
+evals/                 test harness + golden set
 ```
 
-## Design decisions
+## Notes on design
 
-**LangChain for the pipeline.** Loaders, splitter, vector store, retrievers,
-LLM clients — all LangChain. I looked at LlamaIndex (its in-process tool
-model fights my FastAPI-based HR service) and writing the whole pipeline
-myself (too expensive for three days). LangChain won on breadth and time to
-working system. The trade-off is less deep ownership of the retrieval
-algorithms — I can still explain what each piece does.
+**LangChain.** Used it for loaders, splitter, vector store, retrievers, and
+LLM clients. LlamaIndex was the other option but its tool model assumes
+in-process, which clashes with the HTTP HR service. Writing everything from
+scratch wasn't realistic in the time I had.
 
-**Hybrid retrieval.** Dense vectors match meaning; BM25 matches exact terms.
-Either alone leaves gaps — vectors miss rare keywords, BM25 misses
-paraphrases. Reciprocal rank fusion merges the two. `EnsembleRetriever` from
-`langchain-classic` does the merge with a 50/50 weight.
+**Hybrid retrieval.** BM25 + dense vectors with reciprocal rank fusion.
+`EnsembleRetriever` from `langchain-classic`, 50/50 weights. Vectors miss
+rare keywords, BM25 misses paraphrases, the combo handles both.
 
-**Mock HR as a real FastAPI service, not a Python dict.** Real HR systems
-(Workday, SAP, ServiceNow) live in separate processes behind HTTP. Modeling
-that boundary now means swapping for a real API is a base-URL change, not a
-rewrite.
+**Mock HR is a real FastAPI service.** Not a dict. Runs on its own port
+with its own dependencies. Closer to how a real integration with Workday
+or SAP would look — you'd change a base URL, not rewrite.
 
-**Three-way classifier routing.** Every turn starts with an LLM call that
-returns `CAN_ANSWER`, `CALL_EXTERNAL_TOOL`, or `NO_MATCH`. The NO_MATCH path
-is a hardcoded reply — no LLM call for refusals. Saves tokens, gives
-consistent wording.
+**Classifier-first routing.** One cheap LLM call picks the route. Works
+uniformly across providers, which native tool-calling doesn't. NO_MATCH
+short-circuits without a second LLM call.
 
-**Two LLM providers behind one Protocol.** Anthropic for quality, Ollama for
-"runs with no API key." Swapping is a `.env` change; agent code doesn't
-know which backend it's talking to.
+**Providers behind a Protocol.** Anthropic and Ollama both implement
+`ChatProvider`. A factory picks which one per request. The UI has a
+dropdown but under the hood it's a one-line config change.
 
-**Domain types at the edge.** `Chunk` and `Message` are my own pydantic
-models. LangChain's `Document` and message classes never leave `retrieval/`
-or `providers/`. If I swap LangChain tomorrow, only those folders change.
+**Domain types at the edge.** `Chunk` and `Message` are mine. LangChain's
+types never leave `retrieval/` and `providers/`, they're converted at
+the boundary.
 
-**Prompts in their own file.** Non-code content, iterated separately from
-agent logic. No inline prompt strings scattered across the codebase.
+## Evals
 
-## What I'd add with more time
+See `evals/README.md`. 25 golden questions, measures routing accuracy,
+retrieval hit@3, and answer correctness. Run:
 
-- **Evaluation harness.** A golden Q/A set with retrieval hit@k, routing
-  accuracy, and answer correctness. This is the biggest quality lever and
-  the next thing I would build.
-- **Conversation history.** Each turn is independent right now. Real chat
-  needs session memory.
-- **Authenticated user identity.** `CURRENT_EMPLOYEE_ID` is hardcoded to
-  `"E001"` for the demo. In production this comes from the session.
-- **Streaming.** Answers arrive all at once; streaming tokens via SSE would
-  make the UI feel faster.
-- **Unit tests** on the translator functions and dispatcher helpers.
-- **Incremental ingestion.** I re-index everything on startup. Real systems
-  hash files and skip unchanged ones.
-- **Page numbers in citations.** LangChain's PDF page metadata gets dropped
-  at the loader boundary; preserving it would tighten citations.
-- **Markdown-aware chunking** via `MarkdownHeaderTextSplitter` to preserve
-  section context.
-- **Retry with backoff** on HR API calls.
-- **Input filtering** against prompt injection — user text flows straight
-  into the LLM right now.
+```
+uv run python evals/run_evals.py
+```
+
+Current scores vary by provider and model. Numbers from my runs are in
+the detailed JSONL output under `evals/results/`.
+
+## Things I'd add
+
+- conversation history (each turn is independent right now)
+- auth — `CURRENT_EMPLOYEE_ID` is hardcoded to `E001` for the demo
+- SSE streaming — answers currently arrive in one chunk
+- unit tests on the translators and dispatchers
+- incremental ingestion instead of full reindex on startup
+- page numbers preserved through the PDF loader for tighter citations
+- markdown-aware chunking
+- retry/backoff on HR API calls
+- prompt injection guards on user input
 
 ## Stack
 
-Python 3.12, uv for packages, FastAPI for the web layer, LangChain
-(community + classic + chroma + huggingface + text-splitters + anthropic +
-ollama), ChromaDB for vectors, BGE-small-en-v1.5 for embeddings (local, no
-API key), structlog for logging, pydantic for settings and domain types,
-Ruff for lint/format.
+Python 3.12, uv, FastAPI, LangChain (community / classic / chroma / huggingface /
+text-splitters / anthropic / ollama), ChromaDB, BGE-small-en-v1.5 embeddings,
+structlog, pydantic + pydantic-settings, Ruff.

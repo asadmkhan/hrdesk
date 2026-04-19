@@ -16,6 +16,10 @@ class AnthropicProvider:
             stop=None,
         )
 
+    @staticmethod
+    def is_available() -> bool:
+        return settings.anthropic_api_key is not None
+
     def chat(self, messages: list[Message]) -> Message:
         lc_messages = [to_langchain_message(m) for m in messages]
         reply = self._llm.invoke(lc_messages)

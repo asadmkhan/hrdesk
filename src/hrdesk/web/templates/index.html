@@ -29,10 +29,38 @@
     padding-bottom: 16px;
     border-bottom: 1px solid #e5e7eb;
     margin-bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
   }
 
-  header h1 { font-size: 20px; font-weight: 600; }
-  header p { color: #6b7280; font-size: 14px; margin-top: 4px; }
+  .title h1 { font-size: 20px; font-weight: 600; }
+  .title p { color: #6b7280; font-size: 14px; margin-top: 4px; }
+
+  .provider {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #6b7280;
+  }
+
+  .provider select {
+    font-size: 12px;
+    padding: 4px 6px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: white;
+    font-family: inherit;
+    color: #374151;
+    cursor: pointer;
+  }
+  .provider select:disabled {
+    background: #f3f4f6;
+    color: #9ca3af;
+    cursor: not-allowed;
+  }
 
   .examples {
     display: flex;
@@ -51,7 +79,8 @@
     color: #374151;
     font-family: inherit;
   }
-  .example-btn:hover { background: #f3f4f6; }
+  .example-btn:hover:not(:disabled) { background: #f3f4f6; }
+  .example-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
   #messages {
     flex: 1;
@@ -85,11 +114,27 @@
     border-bottom-left-radius: 4px;
   }
 
+  .msg .badge {
+    display: block;
+    font-size: 11px;
+    color: #9ca3af;
+    margin-top: 6px;
+  }
+
   .msg.error {
     align-self: flex-start;
     background: #fef2f2;
     border: 1px solid #fecaca;
     color: #991b1b;
+  }
+
+  .msg.system {
+    align-self: center;
+    max-width: 100%;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    color: #92400e;
+    font-size: 13px;
   }
 
   .typing {
@@ -123,6 +168,11 @@
     outline: none;
     border-color: #4f46e5;
   }
+  input[type="text"]:disabled {
+    background: #f3f4f6;
+    color: #9ca3af;
+    cursor: not-allowed;
+  }
 
   button[type="submit"] {
     padding: 10px 20px;
@@ -142,8 +192,14 @@
 <body>
   <div class="app">
     <header>
-      <h1>HRDesk</h1>
-      <p>Ask about company policies or your personal HR data.</p>
+      <div class="title">
+        <h1>HRDesk</h1>
+        <p>Ask about company policies or your personal HR data.</p>
+      </div>
+      <label class="provider">
+        Model:
+        <select id="provider-select"></select>
+      </label>
     </header>
 
     <div class="examples">
@@ -166,11 +222,26 @@
     const form = document.getElementById("input-form");
     const input = document.getElementById("question");
     const sendBtn = document.getElementById("send-btn");
+    const providerSelect = document.getElementById("provider-select");
+    const exampleBtns = document.querySelectorAll(".example-btn");
 
-    function addMessage(role, text) {
+    function setDisabled(disabled) {
+      input.disabled = disabled;
+      sendBtn.disabled = disabled;
+      providerSelect.disabled = disabled;
+      exampleBtns.forEach((b) => { b.disabled = disabled; });
+    }
+
+    function addMessage(role, text, providerUsed) {
       const div = document.createElement("div");
       div.className = `msg ${role}`;
       div.textContent = text;
+      if (providerUsed) {
+        const badge = document.createElement("span");
+        badge.className = "badge";
+        badge.textContent = `via ${providerUsed}`;
+        div.appendChild(badge);
+      }
       messagesEl.appendChild(div);
       div.scrollIntoView({ behavior: "smooth", block: "end" });
       return div;
@@ -185,6 +256,34 @@
       return div;
     }
 
+    async function loadProviders() {
+      try {
+        const res = await fetch("/api/providers");
+        const data = await res.json();
+        providerSelect.innerHTML = "";
+
+        if (!data.available.length) {
+          addMessage(
+            "system",
+            "No LLM providers are available. Start Ollama locally or set ANTHROPIC_API_KEY in your .env file, then reload this page."
+          );
+          setDisabled(true);
+          return;
+        }
+
+        for (const name of data.available) {
+          const opt = document.createElement("option");
+          opt.value = name;
+          opt.textContent = name;
+          if (name === data.default) opt.selected = true;
+          providerSelect.appendChild(opt);
+        }
+      } catch (err) {
+        addMessage("error", "Failed to load providers: " + err.message);
+        setDisabled(true);
+      }
+    }
+
     async function ask(question) {
       if (!question.trim()) return;
 
@@ -197,7 +296,10 @@
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question }),
+          body: JSON.stringify({
+            question,
+            provider: providerSelect.value,
+          }),
         });
         typingEl.remove();
         if (!res.ok) {
@@ -205,7 +307,7 @@
           return;
         }
         const data = await res.json();
-        addMessage("assistant", data.answer);
+        addMessage("assistant", data.answer, data.provider);
       } catch (err) {
         typingEl.remove();
         addMessage("error", "Network error: " + err.message);
@@ -220,10 +322,11 @@
       ask(input.value);
     });
 
-    document.querySelectorAll(".example-btn").forEach((btn) => {
+    exampleBtns.forEach((btn) => {
       btn.addEventListener("click", () => ask(btn.dataset.q));
     });
 
+    loadProviders();
     input.focus();
   </script>
 </body>

@@ -1,3 +1,4 @@
+import httpx
 from langchain_ollama import ChatOllama
 
 from hrdesk.config import settings
@@ -11,6 +12,14 @@ class OllamaProvider:
             model=settings.ollama_model,
             base_url=settings.ollama_base_url,
         )
+
+    @staticmethod
+    def is_available() -> bool:
+        try:
+            r = httpx.get(f"{settings.ollama_base_url}/api/tags", timeout=1.5)
+            return r.status_code == 200
+        except httpx.RequestError:
+            return False
 
     def chat(self, messages: list[Message]) -> Message:
         lc_messages = [to_langchain_message(m) for m in messages]

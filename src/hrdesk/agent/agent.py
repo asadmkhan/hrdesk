@@ -7,6 +7,7 @@ from hrdesk.agent.prompts import (
     NO_MATCH_REPLY,
     TOOL_ANSWER_SYSTEM_PROMPT,
 )
+from hrdesk.config import LLMProvider
 from hrdesk.domain.message import Message
 from hrdesk.observability.logging import get_logger
 from hrdesk.providers.factory import get_provider
@@ -20,19 +21,19 @@ CURRENT_EMPLOYEE_ID = "E001"
 _JSON_OBJECT = re.compile(r"\{.*\}", re.DOTALL)
 
 
-def answer(question: str) -> str:
-    route = _classify(question)
+def answer(question: str, provider_override: LLMProvider | None = None) -> str:
+    route = _classify(question, provider_override)
     log.info("agent_routed", question=question, route=route)
 
     if route == "CAN_ANSWER":
-        return _answer_from_docs(question)
+        return _answer_from_docs(question, provider_override)
     if route == "CALL_EXTERNAL_TOOL":
-        return _answer_via_tool(question)
+        return _answer_via_tool(question, provider_override)
     return NO_MATCH_REPLY
 
 
-def _classify(question: str) -> str:
-    provider = get_provider()
+def _classify(question: str, provider_override: LLMProvider | None = None) -> str:
+    provider = get_provider(provider_override)
     reply = provider.chat(
         [
             Message(role="system", content=CLASSIFIER_SYSTEM_PROMPT),
@@ -46,7 +47,7 @@ def _classify(question: str) -> str:
     return label
 
 
-def _answer_from_docs(question: str) -> str:
+def _answer_from_docs(question: str, provider_override: LLMProvider | None = None) -> str:
     chunks = hybrid.search(question, k=3)
     if not chunks:
         return "I could not find any relevant information in the HR documents."
@@ -54,7 +55,7 @@ def _answer_from_docs(question: str) -> str:
     context = "\n\n".join(f"[source: {c.source.name}]\n{c.text}" for c in chunks)
     user_prompt = f"Context:\n{context}\n\nQuestion: {question}"
 
-    provider = get_provider()
+    provider = get_provider(provider_override)
     reply = provider.chat(
         [
             Message(role="system", content=ANSWER_SYSTEM_PROMPT),
@@ -64,7 +65,7 @@ def _answer_from_docs(question: str) -> str:
     return reply.content
 
 
-def _answer_via_tool(question: str) -> str:
+def _answer_via_tool(question: str, provider_override: LLMProvider | None = None) -> str:
     schemas = registry.all_schemas()
     tool_list = "\n".join(
         f"- {s.name}: {s.description}\n  parameters: {json.dumps(s.parameters)}" for s in schemas
@@ -78,7 +79,7 @@ def _answer_via_tool(question: str) -> str:
         "No explanation, no markdown, no code fences. Just the JSON."
     )
 
-    provider = get_provider()
+    provider = get_provider(provider_override)
     selection = provider.chat(
         [
             Message(role="system", content=selection_prompt),

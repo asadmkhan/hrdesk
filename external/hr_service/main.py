@@ -22,12 +22,12 @@ _EMPLOYEES: dict[str, dict] = {
         "days_used": 7,
     },
     "E002": {
-        "employee_name": "James Frank ",
+        "employee_name": "James Cook ",
         "days_total": 25,
         "days_used": 14,
     },
     "E003": {
-        "employee_name": "Priya Sharma",
+        "employee_name": "Tom Latham",
         "days_total": 25,
         "days_used": 22,
     },
