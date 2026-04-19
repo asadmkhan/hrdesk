@@ -1,7 +1,7 @@
 # HRDesk
 
 RAG chatbot for HR questions. Answers policy stuff from company docs, looks up
-personal data (vacation balance) from a mock HR service.
+personal data (vacation balance, profile) from a mock HR service.
 
 Take-home project.
 
@@ -10,7 +10,7 @@ Take-home project.
 Three types of questions, three code paths:
 
 - policy question (e.g. "what's the dress code?") → retrieve from docs, cite source
-- personal data ("how many vacation days do I have left?") → call the HR service
+- personal data ("how many vacation days do I have left?", "what's my name?") → call the HR service
 - off-topic ("what's the weather?") → canned refusal, no LLM call
 
 A small classifier picks the path on every turn.
@@ -94,14 +94,14 @@ src/hrdesk/
 ├── providers/       Anthropic + Ollama adapters
 ├── ingestion/       loaders, chunker, pipeline
 ├── retrieval/       chroma + bm25 + hybrid
-├── tools/           tool protocol + registry + vacation tool
-├── agent/           prompts + 3-way routing
+├── tools/           vacation balance + profile, behind auth injection
+├── agent/           prompts + 3-way routing + privacy guard
 ├── observability/   structlog
 └── web/             FastAPI + chat HTML
 
 external/hr_service/   separate mock service
 data/                  sample HR docs
-evals/                 test harness + golden set
+evals/                 test harness + eval set
 ```
 
 ## Notes on design
@@ -131,29 +131,34 @@ dropdown but under the hood it's a one-line config change.
 types never leave `retrieval/` and `providers/`, they're converted at
 the boundary.
 
+**Auth is injected by the agent, not the LLM.** Tool schemas don't have
+an employee_id field. The agent passes the current user to the tool
+directly. There's also a small text check that blocks questions phrased
+about someone else ("how many days does Marcel have?") before it reaches
+the LLM.
+
 ## Evals
 
-See `evals/README.md`. 25 golden questions, measures routing accuracy,
-retrieval hit@3, and answer correctness. Run:
+See `evals/README.md`. 37 test cases. Run:
 
 ```
 uv run python evals/run_evals.py
 ```
 
-Current scores vary by provider and model. Numbers from my runs are in
-the detailed JSONL output under `evals/results/`.
+Scores vary by provider and model. Per-case JSONL lands in `evals/results/`.
 
 ## Things I'd add
 
 - conversation history (each turn is independent right now)
-- auth — `CURRENT_EMPLOYEE_ID` is hardcoded to `E001` for the demo
+- real auth — `CURRENT_EMPLOYEE_ID` is hardcoded to `E001` for the demo
 - SSE streaming — answers currently arrive in one chunk
-- unit tests on the translators and dispatchers
-- incremental ingestion instead of full reindex on startup
+- unit tests on the translators and the third-party heuristic
+- incremental ingestion with content hashing instead of full reindex
 - page numbers preserved through the PDF loader for tighter citations
 - markdown-aware chunking
 - retry/backoff on HR API calls
 - prompt injection guards on user input
+- employee directory with proper authorization for cross-employee lookups
 
 ## Stack
 
